@@ -1,4 +1,4 @@
-import { ConnectionPool, config as SqlConfig } from 'mssql';
+﻿import { ConnectionPool, config as SqlConfig } from 'mssql';
 import { config } from './index';
 
 const sqlConfig: SqlConfig = {
@@ -18,16 +18,18 @@ const sqlConfig: SqlConfig = {
   },
 };
 
-let sqlPool: ConnectionPool | null = null;
+let sqlPoolInstance: ConnectionPool | null = null;
+let sqlPoolPromise: Promise<ConnectionPool> | null = null;
 
 export const initializeDatabase = async (): Promise<ConnectionPool> => {
   try {
-    if (!sqlPool) {
-      sqlPool = new ConnectionPool(sqlConfig);
-      await sqlPool.connect();
+    if (!sqlPoolPromise) {
+      sqlPoolInstance = new ConnectionPool(sqlConfig);
+      sqlPoolPromise = sqlPoolInstance.connect().then(() => sqlPoolInstance as ConnectionPool);
+      await sqlPoolPromise;
       console.info('Connected to SQL Server successfully (Windows Authentication)');
     }
-    return sqlPool;
+    return sqlPoolPromise;
   } catch (error) {
     console.error('Failed to connect to SQL Server:', error);
     process.exit(1);
@@ -35,15 +37,17 @@ export const initializeDatabase = async (): Promise<ConnectionPool> => {
 };
 
 export const getConnection = (): ConnectionPool => {
-  if (!sqlPool || !sqlPool.connected) {
+  if (!sqlPoolInstance || !sqlPoolInstance.connected) {
     throw new Error('Database connection not initialized. Call initializeDatabase() first.');
   }
-  return sqlPool;
+  return sqlPoolInstance;
 };
 
+export const sqlPool = initializeDatabase();
+
 export const closeDatabase = async (): Promise<void> => {
-  if (sqlPool && sqlPool.connected) {
-    await sqlPool.close();
+  if (sqlPoolPromise && (await sqlPoolPromise).connected) {
+    await (await sqlPoolPromise).close();
     console.info('Database connection closed');
   }
 };

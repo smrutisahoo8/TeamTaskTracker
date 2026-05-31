@@ -1,4 +1,4 @@
-import { sqlPool } from '../config/database';
+﻿import { sqlPool } from '../config/database';
 
 export class TaskRepository {
   async create(task: any) {
@@ -41,7 +41,7 @@ export class TaskRepository {
   async updateStatus(id: number, status: string) {
     const pool = await sqlPool;
 
-    await pool.request()
+    const result = await pool.request()
       .input('id', id)
       .input('status', status)
       .query(`
@@ -49,9 +49,68 @@ export class TaskRepository {
         SET Status = @status,
             UpdatedAt = GETUTCDATE()
         WHERE Id = @id
+        SELECT * FROM Tasks WHERE Id = @id
       `);
 
-    return { id, status };
+    return result.recordset[0];
+  }
+
+  async updateTask(id: number, updates: any) {
+    const pool = await sqlPool;
+    const request = pool.request().input('id', id);
+    const fields: string[] = [];
+
+    if (updates.title !== undefined) {
+      request.input('title', updates.title);
+      fields.push('Title = @title');
+    }
+    if (updates.description !== undefined) {
+      request.input('description', updates.description);
+      fields.push('Description = @description');
+    }
+    if (updates.priority !== undefined) {
+      request.input('priority', updates.priority);
+      fields.push('Priority = @priority');
+    }
+    if (updates.assigneeId !== undefined) {
+      request.input('assigneeId', updates.assigneeId);
+      fields.push('AssigneeId = @assigneeId');
+    }
+    if (updates.projectId !== undefined) {
+      request.input('projectId', updates.projectId);
+      fields.push('ProjectId = @projectId');
+    }
+    if (updates.dueDate !== undefined) {
+      request.input('dueDate', updates.dueDate);
+      fields.push('DueDate = @dueDate');
+    }
+
+    if (fields.length === 0) {
+      return this.findById(id);
+    }
+
+    const updateClause = fields.join(', ');
+    const result = await request.query(`
+      UPDATE Tasks
+      SET ${updateClause}, UpdatedAt = GETUTCDATE()
+      WHERE Id = @id
+      SELECT * FROM Tasks WHERE Id = @id
+    `);
+
+    return result.recordset[0];
+  }
+
+  async deleteTask(id: number) {
+    const pool = await sqlPool;
+
+    await pool.request()
+      .input('id', id)
+      .query(`
+        UPDATE Tasks
+        SET IsDeleted = 1,
+            UpdatedAt = GETUTCDATE()
+        WHERE Id = @id
+      `);
   }
 
   async findAll(filters: any) {
@@ -62,7 +121,6 @@ export class TaskRepository {
     const offset = (page - 1) * limit;
 
     let where = `WHERE IsDeleted = 0`;
-
     const request = pool.request();
 
     if (filters.status) {
@@ -78,6 +136,11 @@ export class TaskRepository {
     if (filters.assigneeId) {
       where += ` AND AssigneeId = @assigneeId`;
       request.input('assigneeId', filters.assigneeId);
+    }
+
+    if (filters.projectId) {
+      where += ` AND ProjectId = @projectId`;
+      request.input('projectId', filters.projectId);
     }
 
     const result = await request.query(`

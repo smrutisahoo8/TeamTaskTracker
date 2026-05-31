@@ -19,7 +19,6 @@
     "express-validator": "^7.3.2",
     "helmet": "^7.0.0",
     "jsonwebtoken": "^9.0.3",
-    "msnodesqlv8": "^5.2.0",
     "mssql": "^9.3.2",
     "redis": "^6.0.0",
     "swagger-jsdoc": "^6.2.8",

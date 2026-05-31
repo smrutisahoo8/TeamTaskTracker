@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
 
   sqlserver:
@@ -20,6 +18,9 @@ services:
 
     restart: unless-stopped
 
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+
   redis:
     image: redis:7-alpine
     container_name: teamtasktracker-redis
@@ -28,7 +29,6 @@ services:
       - "6379:6379"
 
     restart: unless-stopped
-
 
   api:
     build: ./backend
@@ -49,6 +49,11 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       JWT_SECRET: your-secret
-      JWT_REFRESH_SECRET: your-refresh-secret  
+      JWT_REFRESH_SECRET: your-refresh-secret
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    command: npm run dev
 
- 
+volumes:
+  sqlserver_data:

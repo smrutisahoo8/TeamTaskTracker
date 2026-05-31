@@ -14,6 +14,8 @@ import { connectRedis } from './config/redis';
 import healthRoutes from './routes/health.routes';
 import authRoutes from './routes/auth.routes';
 import taskRoutes from './routes/task.routes';
+import userRoutes from './routes/user.routes';
+import projectRoutes from './routes/project.routes';
 
 import { requestLogger } from './middleware/logger.middleware';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
@@ -30,6 +32,8 @@ app.use(requestLogger);
 app.use(`${config.app.basePath}/health`, healthRoutes);
 app.use(`${config.app.basePath}/auth`, authRoutes);
 app.use(`${config.app.basePath}/tasks`, taskRoutes);
+app.use(`${config.app.basePath}/users`, userRoutes);
+app.use(`${config.app.basePath}/projects`, projectRoutes);
 
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 

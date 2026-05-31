@@ -45,6 +45,44 @@ export class UserRepository {
       .query('UPDATE Users SET updatedAt = GETUTCDATE() WHERE id = @id');
   }
 
+  async findAll(): Promise<IUser[]> {
+    const connection = getConnection();
+    const result = await connection.request().query('SELECT * FROM Users');
+    return result.recordset;
+  }
+
+  async updateRole(id: number, role: string): Promise<IUser> {
+    const connection = getConnection();
+    const result = await connection.request()
+      .input('id', id)
+      .input('role', role)
+      .query(`
+        UPDATE Users
+        SET role = @role,
+            updatedAt = GETUTCDATE()
+        WHERE id = @id;
+        SELECT * FROM Users WHERE id = @id;
+      `);
+
+    return result.recordset[0];
+  }
+
+  async updateStatus(id: number, isActive: boolean): Promise<IUser> {
+    const connection = getConnection();
+    const result = await connection.request()
+      .input('id', id)
+      .input('isActive', isActive)
+      .query(`
+        UPDATE Users
+        SET isActive = @isActive,
+            updatedAt = GETUTCDATE()
+        WHERE id = @id;
+        SELECT * FROM Users WHERE id = @id;
+      `);
+
+    return result.recordset[0];
+  }
+
   async checkEmailExists(email: string): Promise<boolean> {
     const connection = getConnection();
     const result = await connection.request()
