@@ -1,29 +1,30 @@
-import { ConnectionPool, config as SqlConfig } from 'mssql';
+import sql from 'mssql';
 import { config } from './index';
 
-const sqlConfig: SqlConfig = {
+const sqlConfig: sql.config = {
   user: config.db.user,
   password: config.db.password,
   server: config.db.server,
-  port: config.db.port,
   database: config.db.database,
-  pool: {
-    max: 10,
-    min: 0,
-    idleTimeoutMillis: 30000,
-  },
+  port: config.db.port,
+
   options: {
-    encrypt: true,
+    encrypt: false,
     trustServerCertificate: true,
   },
 };
 
-export const sqlPool = new ConnectionPool(sqlConfig);
+export const sqlPool = new sql.ConnectionPool(sqlConfig);
 
 export const connectDB = async () => {
-  if (!sqlPool.connected) {
+  try {
+    console.log("DB CONFIG CHECK:", sqlConfig); // 🔥 IMPORTANT DEBUG
+
     await sqlPool.connect();
-    console.info('Connected to SQL Server successfully');
+
+    console.log('Connected to SQL Server successfully');
+  } catch (error) {
+    console.error('SQL Connection Failed:', error);
+    throw error;
   }
-  return sqlPool;
 };

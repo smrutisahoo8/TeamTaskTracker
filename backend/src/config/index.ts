@@ -13,11 +13,13 @@ export const config = {
     basePath: process.env.APP_BASE_PATH || '/api',
   },
   db: {
-    user: process.env.DB_USER || 'sa',
-    password: process.env.DB_PASSWORD || '',
     server: process.env.DB_SERVER || 'localhost',
     port: parseNumber(process.env.DB_PORT, 1433),
-    database: process.env.DB_NAME || 'TeamTaskTracker',
+    database: process.env.DB_DATABASE || 'TeamTaskTrackerDB',
+
+    // ✅ ADD THESE
+    user: process.env.DB_USER || 'sa',
+    password: process.env.DB_PASSWORD || '',
   },
   redis: {
     host: process.env.REDIS_HOST || '127.0.0.1',
@@ -27,5 +29,9 @@ export const config = {
   swagger: {
     title: process.env.SWAGGER_TITLE || 'Team Task Tracker API',
     version: process.env.SWAGGER_VERSION || '1.0.0',
+  },
+  jwt: {
+    secret: process.env.JWT_SECRET || 'your-secret-key',
+    refreshSecret: process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key',
   },
 };

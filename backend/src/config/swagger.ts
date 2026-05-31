@@ -6,7 +6,7 @@ const swaggerDefinition = {
   info: {
     title: config.swagger.title,
     version: config.swagger.version,
-    description: 'Phase 1 API documentation for Team Task Tracker.',
+    description: 'Team Task Tracker API - Phase 2 with Authentication & RBAC.',
   },
   servers: [
     {
@@ -14,6 +14,15 @@ const swaggerDefinition = {
       description: 'Local development server',
     },
   ],
+  components: {
+    securitySchemes: {
+      BearerAuth: {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+      },
+    },
+  },
 };
 
 const swaggerOptions = {

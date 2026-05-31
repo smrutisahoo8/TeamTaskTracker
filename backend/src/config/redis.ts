@@ -3,22 +3,63 @@ import { config } from './index';
 
 const redisUrl = `redis://${config.redis.host}:${config.redis.port}`;
 
-export const redisClient: RedisClientType = createClient({
-  url: redisUrl,
-  password: config.redis.password || undefined,
-});
+let redisClient: RedisClientType | null = null;
+let isRedisConnected = false;
 
-redisClient.on('error', (error) => {
-  console.error('Redis client error:', error);
-});
+const createRedisClient = (): RedisClientType => {
+  const client = createClient({
+    url: redisUrl,
+    password: config.redis.password || undefined,
+  });
 
-redisClient.on('connect', () => {
-  console.info('Connected to Redis successfully');
-});
+  client.on('error', (error) => {
+    console.warn('[Redis] Connection error (non-critical):', error.message);
+    isRedisConnected = false;
+  });
 
-export const connectRedis = async () => {
-  if (!redisClient.isOpen) {
-    await redisClient.connect();
+  client.on('connect', () => {
+    console.info('[Redis] Connected successfully');
+    isRedisConnected = true;
+  });
+
+  client.on('reconnecting', () => {
+    console.warn('[Redis] Attempting to reconnect...');
+  });
+
+  return client;
+};
+
+export const connectRedis = async (): Promise<void> => {
+  try {
+    if (!redisClient) {
+      redisClient = createRedisClient();
+    }
+
+    if (!redisClient.isOpen) {
+      await redisClient.connect();
+      isRedisConnected = true;
+    }
+  } catch (error) {
+    console.warn('[Redis] Connection unavailable - continuing without cache:', error instanceof Error ? error.message : String(error));
+    isRedisConnected = false;
   }
-  return redisClient;
+};
+
+export const getRedisClient = (): RedisClientType | null => {
+  return redisClient && isRedisConnected ? redisClient : null;
+};
+
+export const isRedisAvailable = (): boolean => {
+  return isRedisConnected && redisClient?.isOpen === true;
+};
+
+export const closeRedis = async (): Promise<void> => {
+  if (redisClient && redisClient.isOpen) {
+    try {
+      await redisClient.quit();
+      console.info('[Redis] Connection closed');
+    } catch (error) {
+      console.warn('[Redis] Error closing connection:', error instanceof Error ? error.message : String(error));
+    }
+  }
 };
