@@ -5,6 +5,11 @@ import { redisClient } from '../config/redis';
 const repo = new TaskRepository();
 
 export class TaskService {
+
+  private cacheKey(userId: number, filters: any) {
+    return `tasks:${userId}:${JSON.stringify(filters || {})}`;
+  }
+
   async createTask(data: any, user: any) {
     const result = await repo.create({
       ...data,
@@ -17,7 +22,7 @@ export class TaskService {
   }
 
   async getTasks(filters: any, user: any) {
-    const key = `tasks:${user.id}:${JSON.stringify(filters)}`;
+    const key = this.cacheKey(user.id, filters);
 
     const cached = await redisClient.get(key);
     if (cached) return JSON.parse(cached);
@@ -32,16 +37,33 @@ export class TaskService {
   async updateStatus(taskId: number, newStatus: string, user: any) {
     const task = await repo.findById(taskId);
 
-    if (!task) throw new Error('TASK_NOT_FOUND');
+    if (!task) {
+      throw {
+        status: 404,
+        code: 'TASK_NOT_FOUND',
+        message: 'Task not found',
+      };
+    }
 
     const allowed = STATUS_FLOW[task.Status] || [];
 
     if (!allowed.includes(newStatus)) {
-      throw new Error(`Invalid transition ${task.Status} → ${newStatus}`);
+      throw {
+        status: 400,
+        code: 'INVALID_STATUS_TRANSITION',
+        message: `Invalid transition ${task.Status} → ${newStatus}`,
+      };
     }
 
-    if (user.role !== 'MANAGER' && task.AssigneeId !== user.id) {
-      throw new Error('FORBIDDEN');
+    const isManager = user.role === 'MANAGER';
+    const isAssignee = task.AssigneeId === user.id;
+
+    if (!isManager && !isAssignee) {
+      throw {
+        status: 403,
+        code: 'FORBIDDEN',
+        message: 'Not allowed to update task status',
+      };
     }
 
     await repo.updateStatus(taskId, newStatus);
@@ -53,7 +75,8 @@ export class TaskService {
 
   async clearCache(userId: number) {
     const keys = await redisClient.keys(`tasks:${userId}:*`);
-    if (keys.length) {
+
+    if (keys.length > 0) {
       await redisClient.del(keys);
     }
   }

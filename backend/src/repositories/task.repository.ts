@@ -4,7 +4,7 @@ export class TaskRepository {
   async create(task: any) {
     const pool = await sqlPool;
 
-    return pool.request()
+    const result = await pool.request()
       .input('title', task.title)
       .input('description', task.description)
       .input('priority', task.priority)
@@ -16,9 +16,12 @@ export class TaskRepository {
       .query(`
         INSERT INTO Tasks
         (Title, Description, Priority, Status, AssigneeId, ProjectId, CreatedBy, DueDate)
+        OUTPUT INSERTED.*
         VALUES
         (@title, @description, @priority, @status, @assigneeId, @projectId, @createdBy, @dueDate)
       `);
+
+    return result.recordset[0];
   }
 
   async findById(id: number) {
@@ -26,7 +29,11 @@ export class TaskRepository {
 
     const result = await pool.request()
       .input('id', id)
-      .query('SELECT * FROM Tasks WHERE Id = @id AND IsDeleted = 0');
+      .query(`
+        SELECT * 
+        FROM Tasks 
+        WHERE Id = @id AND IsDeleted = 0
+      `);
 
     return result.recordset[0];
   }
@@ -34,40 +41,53 @@ export class TaskRepository {
   async updateStatus(id: number, status: string) {
     const pool = await sqlPool;
 
-    return pool.request()
+    await pool.request()
       .input('id', id)
       .input('status', status)
       .query(`
         UPDATE Tasks
-        SET Status = @status, UpdatedAt = GETUTCDATE()
+        SET Status = @status,
+            UpdatedAt = GETUTCDATE()
         WHERE Id = @id
       `);
+
+    return { id, status };
   }
 
   async findAll(filters: any) {
     const pool = await sqlPool;
 
-    let query = `SELECT * FROM Tasks WHERE IsDeleted = 0`;
+    const page = Number(filters.page) || 1;
+    const limit = Number(filters.limit) || 10;
+    const offset = (page - 1) * limit;
+
+    let where = `WHERE IsDeleted = 0`;
+
     const request = pool.request();
 
     if (filters.status) {
-      query += ` AND Status = @status`;
+      where += ` AND Status = @status`;
       request.input('status', filters.status);
     }
 
     if (filters.priority) {
-      query += ` AND Priority = @priority`;
+      where += ` AND Priority = @priority`;
       request.input('priority', filters.priority);
     }
 
     if (filters.assigneeId) {
-      query += ` AND AssigneeId = @assigneeId`;
+      where += ` AND AssigneeId = @assigneeId`;
       request.input('assigneeId', filters.assigneeId);
     }
 
-    query += ` ORDER BY CreatedAt DESC`;
+    const result = await request.query(`
+      SELECT *
+      FROM Tasks
+      ${where}
+      ORDER BY CreatedAt DESC
+      OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY
+    `);
 
-    const result = await request.query(query);
     return result.recordset;
   }
 }
