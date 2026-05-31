@@ -33,7 +33,7 @@ volumes:
   sqlserver_data:
 
   api:
-    build: .
+    build: ./backend
     container_name: teamtasktracker-api
     depends_on:
       - sqlserver
