@@ -2,77 +2,247 @@
 -- Database: TeamTaskTrackerDB
 -- This is a reference for the existing database tables
 
--- Organizations Table
-CREATE TABLE Organizations (
-    id INT PRIMARY KEY IDENTITY(1,1),
-    name NVARCHAR(255) NOT NULL,
-    description NVARCHAR(MAX),
-    createdAt DATETIME DEFAULT GETUTCDATE(),
-    updatedAt DATETIME DEFAULT GETUTCDATE()
-);
+SELECT @@SERVERNAME;
 
--- Users Table
-CREATE TABLE Users (
-    id INT PRIMARY KEY IDENTITY(1,1),
-    organizationId INT NOT NULL,
-    fullName NVARCHAR(255) NOT NULL,
-    email NVARCHAR(255) NOT NULL UNIQUE,
-    passwordHash NVARCHAR(MAX) NOT NULL,
-    role NVARCHAR(50) NOT NULL CHECK (role IN ('ADMIN', 'MANAGER', 'MEMBER')),
-    isActive BIT DEFAULT 1,
-    createdAt DATETIME DEFAULT GETUTCDATE(),
-    updatedAt DATETIME DEFAULT GETUTCDATE(),
-    FOREIGN KEY (organizationId) REFERENCES Organizations(id)
-);
 
--- RefreshTokens Table
-CREATE TABLE RefreshTokens (
-    id INT PRIMARY KEY IDENTITY(1,1),
-    userId INT NOT NULL,
-    token NVARCHAR(MAX) NOT NULL,
-    expiresAt DATETIME NOT NULL,
-    isRevoked BIT DEFAULT 0,
-    createdAt DATETIME DEFAULT GETUTCDATE(),
-    FOREIGN KEY (userId) REFERENCES Users(id)
-);
+IF NOT EXISTS (SELECT * FROM SYS.DATABASES WHERE NAME = 'TEAMTASKTRACKERDB')
+BEGIN
+    CREATE DATABASE TEAMTASKTRACKERDB;
+END
+GO
 
--- Projects Table
-CREATE TABLE Projects (
-    id INT PRIMARY KEY IDENTITY(1,1),
-    organizationId INT NOT NULL,
-    name NVARCHAR(255) NOT NULL,
-    description NVARCHAR(MAX),
-    status NVARCHAR(50) NOT NULL CHECK (status IN ('ACTIVE', 'ARCHIVED')),
-    createdBy INT NOT NULL,
-    createdAt DATETIME DEFAULT GETUTCDATE(),
-    updatedAt DATETIME DEFAULT GETUTCDATE(),
-    FOREIGN KEY (organizationId) REFERENCES Organizations(id),
-    FOREIGN KEY (createdBy) REFERENCES Users(id)
-);
+USE TEAMTASKTRACKERDB;
+GO
 
--- Tasks Table
-CREATE TABLE Tasks (
-    id INT PRIMARY KEY IDENTITY(1,1),
-    projectId INT NOT NULL,
-    title NVARCHAR(255) NOT NULL,
-    description NVARCHAR(MAX),
-    status NVARCHAR(50) NOT NULL CHECK (status IN ('TODO', 'IN_PROGRESS', 'DONE')),
-    priority NVARCHAR(50) NOT NULL CHECK (priority IN ('LOW', 'MEDIUM', 'HIGH')),
-    assignedTo INT,
-    createdBy INT NOT NULL,
-    dueDate DATETIME,
-    createdAt DATETIME DEFAULT GETUTCDATE(),
-    updatedAt DATETIME DEFAULT GETUTCDATE(),
-    FOREIGN KEY (projectId) REFERENCES Projects(id),
-    FOREIGN KEY (assignedTo) REFERENCES Users(id),
-    FOREIGN KEY (createdBy) REFERENCES Users(id)
-);
+-- ============================================
+-- ORGANIZATIONS
+-- ============================================
 
--- Indexes for Performance
-CREATE INDEX idx_users_email ON Users(email);
-CREATE INDEX idx_users_organizationId ON Users(organizationId);
-CREATE INDEX idx_refreshTokens_userId ON RefreshTokens(userId);
-CREATE INDEX idx_refreshTokens_token ON RefreshTokens(token);
-CREATE INDEX idx_projects_organizationId ON Projects(organizationId);
-CREATE INDEX idx_tasks_projectId ON Tasks(projectId);
-CREATE INDEX idx_tasks_assignedTo ON Tasks(assignedTo);
+CREATE TABLE Organizations
+(
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+
+    Name NVARCHAR(200) NOT NULL,
+
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+
+    UpdatedAt DATETIME2 NULL,
+
+    IsDeleted BIT NOT NULL DEFAULT 0
+);
+GO
+
+-- ============================================
+-- USERS
+-- ============================================
+
+CREATE TABLE Users
+(
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+
+    OrganizationId INT NOT NULL,
+
+    FullName NVARCHAR(200) NOT NULL,
+
+    Email NVARCHAR(255) NOT NULL,
+
+    PasswordHash NVARCHAR(MAX) NOT NULL,
+
+    Role NVARCHAR(20) NOT NULL,
+
+    IsActive BIT NOT NULL DEFAULT 1,
+
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+
+    UpdatedAt DATETIME2 NULL,
+
+    IsDeleted BIT NOT NULL DEFAULT 0,
+
+    CONSTRAINT FK_Users_Organizations
+        FOREIGN KEY (OrganizationId)
+        REFERENCES Organizations(Id),
+
+    CONSTRAINT UQ_Users_Email
+        UNIQUE (Email),
+
+    CONSTRAINT CK_Users_Role
+        CHECK (Role IN ('ADMIN', 'MANAGER', 'MEMBER'))
+);
+GO
+
+-- ============================================
+-- PROJECTS
+-- ============================================
+
+CREATE TABLE Projects
+(
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+
+    OrganizationId INT NOT NULL,
+
+    Name NVARCHAR(200) NOT NULL,
+
+    Description NVARCHAR(1000) NULL,
+
+    CreatedBy INT NOT NULL,
+
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+
+    UpdatedAt DATETIME2 NULL,
+
+    IsDeleted BIT NOT NULL DEFAULT 0,
+
+    CONSTRAINT FK_Projects_Organizations
+        FOREIGN KEY (OrganizationId)
+        REFERENCES Organizations(Id),
+
+    CONSTRAINT FK_Projects_CreatedBy
+        FOREIGN KEY (CreatedBy)
+        REFERENCES Users(Id)
+);
+GO
+
+-- ============================================
+-- TASKS
+-- ============================================
+
+CREATE TABLE Tasks
+(
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+
+    ProjectId INT NOT NULL,
+
+    Title NVARCHAR(250) NOT NULL,
+
+    Description NVARCHAR(MAX) NULL,
+
+    Priority NVARCHAR(20) NOT NULL DEFAULT 'MEDIUM',
+
+    Status NVARCHAR(30) NOT NULL DEFAULT 'TODO',
+
+    AssigneeId INT NULL,
+
+    CreatedBy INT NOT NULL,
+
+    DueDate DATETIME2 NULL,
+
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+
+    UpdatedAt DATETIME2 NULL,
+
+    IsDeleted BIT NOT NULL DEFAULT 0,
+
+    CONSTRAINT FK_Tasks_Project
+        FOREIGN KEY (ProjectId)
+        REFERENCES Projects(Id),
+
+    CONSTRAINT FK_Tasks_Assignee
+        FOREIGN KEY (AssigneeId)
+        REFERENCES Users(Id),
+
+    CONSTRAINT FK_Tasks_CreatedBy
+        FOREIGN KEY (CreatedBy)
+        REFERENCES Users(Id),
+
+    CONSTRAINT CK_Tasks_Priority
+        CHECK (Priority IN ('LOW', 'MEDIUM', 'HIGH')),
+
+    CONSTRAINT CK_Tasks_Status
+        CHECK (
+            Status IN
+            (
+                'TODO',
+                'IN_PROGRESS',
+                'IN_REVIEW',
+                'DONE',
+                'BLOCKED'
+            )
+        )
+);
+GO
+
+-- ============================================
+-- REFRESH TOKENS
+-- ============================================
+
+CREATE TABLE RefreshTokens
+(
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+
+    UserId INT NOT NULL,
+
+    Token NVARCHAR(MAX) NOT NULL,
+
+    ExpiresAt DATETIME2 NOT NULL,
+
+    IsRevoked BIT NOT NULL DEFAULT 0,
+
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+
+    CONSTRAINT FK_RefreshTokens_User
+        FOREIGN KEY (UserId)
+        REFERENCES Users(Id)
+);
+GO
+
+-- ============================================
+-- INDEXES (ASSIGNMENT REQUIREMENT)
+-- ============================================
+
+CREATE INDEX IX_Tasks_Status
+ON Tasks(Status);
+GO
+
+CREATE INDEX IX_Tasks_AssigneeId
+ON Tasks(AssigneeId);
+GO
+
+CREATE INDEX IX_Tasks_DueDate
+ON Tasks(DueDate);
+GO
+
+CREATE INDEX IX_Tasks_ProjectId
+ON Tasks(ProjectId);
+GO
+
+CREATE INDEX IX_Users_Email
+ON Users(Email);
+GO
+
+-- ============================================
+-- OPTIONAL COMPOSITE INDEXES
+-- ============================================
+
+CREATE INDEX IX_Tasks_Status_Assignee
+ON Tasks(Status, AssigneeId);
+GO
+
+CREATE INDEX IX_Tasks_Status_DueDate
+ON Tasks(Status, DueDate);
+GO
+
+-- ============================================
+-- SEED DATA
+-- ============================================
+
+INSERT INTO Organizations(Name)
+VALUES ('Demo Organization');
+GO
+
+INSERT INTO Users
+(
+    OrganizationId,
+    FullName,
+    Email,
+    PasswordHash,
+    Role
+)
+VALUES
+(
+    1,
+    'System Admin',
+    'admin@teamtracker.com',
+    'REPLACE_WITH_BCRYPT_HASH',
+    'ADMIN'
+);
+GO

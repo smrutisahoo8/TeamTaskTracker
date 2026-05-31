@@ -61,30 +61,87 @@ The backend reads settings from `backend/.env`. Key values include:
 - `REDIS_HOST` / `REDIS_PORT` - Redis connection
 - `JWT_SECRET` / `JWT_REFRESH_SECRET` - token secrets
 
+## Database schema description
+
+The application uses a normalized SQL Server schema with the following primary entities:
+
+- `Organizations`
+  - Stores tenant organization metadata: `Id`, `Name`, `CreatedAt`, `UpdatedAt`, `IsDeleted`.
+- `Users`
+  - Stores application users: `Id`, `OrganizationId`, `FullName`, `Email`, `PasswordHash`, `Role`, `IsActive`, `CreatedAt`, `UpdatedAt`, `IsDeleted`.
+  - Users belong to an organization and can be `ADMIN`, `MANAGER`, or `MEMBER`.
+- `Projects`
+  - Stores projects scoped to an organization: `Id`, `OrganizationId`, `Name`, `Description`, `CreatedBy`, `CreatedAt`, `UpdatedAt`, `IsDeleted`.
+- `Tasks`
+  - Stores tasks attached to a project and potentially assigned to a user: `Id`, `ProjectId`, `Title`, `Description`, `Priority`, `Status`, `AssigneeId`, `CreatedBy`, `DueDate`, `CreatedAt`, `UpdatedAt`, `IsDeleted`.
+- `RefreshTokens`
+  - Stores refresh tokens for JWT rotation: `Id`, `UserId`, `Token`, `ExpiresAt`, `IsRevoked`, `CreatedAt`.
+
+### Relationships
+
+- A `User` belongs to an `Organization`.
+- A `Project` belongs to an `Organization` and is created by a `User`.
+- A `Task` belongs to a `Project`, is created by a `User`, and may be assigned to a `User`.
+- A `RefreshToken` belongs to a `User`.
+
+### Indexes
+
+The schema includes indexes on the most frequently queried fields for task listing and filtering:
+
+- `IX_Tasks_Status` on `Tasks(Status)`
+- `IX_Tasks_AssigneeId` on `Tasks(AssigneeId)`
+- `IX_Tasks_DueDate` on `Tasks(DueDate)`
+- `IX_Tasks_ProjectId` on `Tasks(ProjectId)`
+- `IX_Users_Email` on `Users(Email)`
+
+These indexes are chosen because task list APIs commonly filter tasks by `status`, `assignee`, and `due_date`, and the query planner benefits from these indexes when the task table grows.
+
 ## Caching strategy
 
-The backend caches task list queries in Redis to reduce repeated database reads. Cache keys are generated using the requesting user's ID and the request query filters.
+The backend caches task list results in Redis by using a cache key built from the requesting user's ID and the query filters used for pagination and task list retrieval.
 
-Cache invalidation happens whenever a task is created, updated, deleted, or its status changes. The service clears cached task entries for the affected user so clients always receive fresh task data after mutations.
+Example cache key pattern:
+
+```text
+tasks:<userId>:{"page":1,"limit":10,"status":"TODO","priority":"HIGH"}
+```
+
+### Cache invalidation
+
+Cache invalidation occurs whenever tasks are mutated:
+
+- Task creation
+- Task updates
+- Status updates
+- Task deletion
+
+When a task changes, the backend clears cached task pages for the affected assignee/user so subsequent list requests return fresh data. This ensures that readers do not see stale task state after a mutation.
 
 ## Database design decision
 
-A normalized relational schema is used with separate tables for `Organizations`, `Users`, `Projects`, `Tasks`, and `RefreshTokens`.
+I chose a normalized relational model with explicit foreign key constraints to keep ownership, assignment, and organization boundaries consistent.
 
-Key design choices:
+- `Tasks` are linked to `Projects` and `Users` through explicit foreign keys to enforce data integrity.
+- Indexes on `Status`, `AssigneeId`, and `DueDate` are added because those are the most common filter fields for task queries and help keep list retrieval performant.
+- Keeping `IsDeleted` as a soft-delete flag allows historical cleanup and makes task filtering safer without permanently removing records.
 
-- **Foreign key relationships** keep ownership and membership consistent across organizations, users, projects, and tasks.
-- **Indexed columns** such as `Users.email`, `Projects.organizationId`, and `Tasks.assignedTo` support efficient lookup and filtering.
-- **Role enforcement** in the application layer helps secure user permissions for `ADMIN`, `MANAGER`, and `MEMBER` roles.
+In production, this structure supports scalable task filtering and safe multi-tenant separation while still leaving room for future audit logging or tenant-level policy enforcement.
 
 ## What I would improve or add given more time
 
-- Add a full Postman collection and more complete OpenAPI documentation for all endpoints.
-- Add end-to-end integration tests for auth, task, project, and user flows.
-- Implement database migrations and seed data for reproducible environments.
-- Add audit logging for task and permission changes.
-- Create a richer frontend task/project dashboard with RBAC-based UI flows.
-- Improve caching coverage for additional query types and add cache warming.
+Add database migrations and seed scripts to make the environment fully reproducible across setups.
+
+Introduce structured logging and monitoring (logs, metrics, tracing) for better observability in production.
+
+Enhance RBAC to support dynamic permissions instead of fixed roles for finer-grained access control.
+
+Improve caching with better TTL strategies, cache versioning, and protection against cache stampede.
+
+Introduce event-driven updates for task changes using a message broker for notifications and audit logs.
+
+Add stronger testing coverage including integration tests with real database and CI automation.
+
+Harden security with rate limiting, token revocation tracking, and optional multi-factor authentication for admins.
 
 ## API documentation
 

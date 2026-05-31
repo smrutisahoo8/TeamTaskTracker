@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import HealthCard from '../components/HealthCard';
 import { getHealthStatus } from '../api/health.api';
 import { HealthResponse } from '../types';
@@ -22,11 +23,23 @@ const HomePage = () => {
   }, []);
 
   return (
-    <main>
-      <h1>Team Task Tracker</h1>
-      <p>Foundation setup for Phase 1.</p>
-      <HealthCard health={health} loading={isLoading} error={error} />
-    </main>
+    <section className="page-home">
+      <div className="hero-card">
+        <div>
+          <h1>Team Task Tracker</h1>
+          <p>Manage tasks, projects, and users from a secure team workspace.</p>
+          <div className="hero-actions">
+            <Link to="/login" className="button button-primary">
+              Sign In
+            </Link>
+            <Link to="/register" className="button button-secondary">
+              Register
+            </Link>
+          </div>
+        </div>
+        <HealthCard health={health} loading={isLoading} error={error} />
+      </div>
+    </section>
   );
 };
 
