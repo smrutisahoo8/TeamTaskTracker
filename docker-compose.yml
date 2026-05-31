@@ -31,3 +31,24 @@ services:
 
 volumes:
   sqlserver_data:
+
+  api:
+    build: .
+    container_name: teamtasktracker-api
+    depends_on:
+      - sqlserver
+      - redis
+    ports:
+      - "4000:4000"
+    environment:
+      PORT: 4000
+      APP_BASE_PATH: /api
+      DB_SERVER: sqlserver
+      DB_PORT: 1433
+      DB_DATABASE: TEAMTASKTRACKERDB
+      DB_USER: sa
+      DB_PASSWORD: TeamTracker@123
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: your-secret
+      JWT_REFRESH_SECRET: your-refresh-secret  
