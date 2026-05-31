@@ -6,7 +6,7 @@ const swaggerDefinition = {
   info: {
     title: config.swagger.title,
     version: config.swagger.version,
-    description: 'Team Task Tracker API - Phase 2 with Authentication & RBAC.',
+    description: '',
   },
   servers: [
     {

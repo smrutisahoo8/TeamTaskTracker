@@ -1,41 +1,62 @@
 import cors from 'cors';
-import express, { Request, Response, NextFunction } from 'express';
+import express from 'express';
 import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
 import swaggerSpec from './config/swagger';
 import { config } from './config';
 import { initializeDatabase } from './config/database';
+import { connectRedis } from './config/redis';
+
 import healthRoutes from './routes/health.routes';
 import authRoutes from './routes/auth.routes';
+import taskRoutes from './routes/task.routes';
+
 import { requestLogger } from './middleware/logger.middleware';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
-import { connectRedis } from './config/redis';
-import dotenv from 'dotenv';
-dotenv.config();
+
 const app = express();
 
+// ---------------- MIDDLEWARE ----------------
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
 app.use(requestLogger);
 
+// ---------------- ROUTES ----------------
 app.use(`${config.app.basePath}/health`, healthRoutes);
 app.use(`${config.app.basePath}/auth`, authRoutes);
+app.use(`${config.app.basePath}/tasks`, taskRoutes);
+
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
+// ---------------- ERROR HANDLING ----------------
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-initializeDatabase().catch((error) => {
-  console.error('SQL Server connection failed:', error);
-  process.exit(1);
-});
+// ---------------- START SERVER ----------------
+const startServer = async () => {
+  try {
+    await initializeDatabase();
+    console.log('SQL Server connected');
 
-connectRedis();
+    await connectRedis();
+    console.log('Redis connected');
 
-const port = config.app.port;
-app.listen(port, () => {
-  console.info(`API server is running on port ${port}`);
-});
+    const port = config.app.port;
+
+    app.listen(port, () => {
+      console.log(`API server running on port ${port}`);
+    });
+  } catch (err) {
+    console.error('Server startup failed:', err);
+    process.exit(1);
+  }
+};
+
+startServer();
 
 export default app;

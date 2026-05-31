@@ -3,6 +3,7 @@ import { healthCheck } from '../controllers/health.controller';
 
 const router = Router();
 
-router.get('/health', healthCheck);
+// ✅ FIX: base path already added in app.ts
+router.get('/', healthCheck);
 
 export default router;
